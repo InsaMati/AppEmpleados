@@ -20,3 +20,4 @@ namespace Infraestructura.Data.Config
         }
     }
 }
+
