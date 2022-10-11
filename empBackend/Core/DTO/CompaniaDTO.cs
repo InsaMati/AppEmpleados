@@ -1,10 +1,13 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Threading.Tasks;
 
-namespace Core.Entidades
+namespace Core.DTO
 {
-    public class compania
+    public class CompaniaDTO
     {
-        [Key]
         public int Id { get; set; }
 
         [Required(ErrorMessage = "El nombre de la compañia es requerido.")]
@@ -17,9 +20,9 @@ namespace Core.Entidades
         [Display(Name = "Direccion")]
         public string Direccion { get; set; }
 
-        [Required(ErrorMessage = "El numero de telefono es requerido.")]        
+        [Required(ErrorMessage = "El numero de telefono es requerido.")]       
         public int Telefono { get; set; }
-         
+        
         public int Telefono2 { get; set; }
     }
 }

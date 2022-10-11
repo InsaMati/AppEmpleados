@@ -1,3 +1,4 @@
+using AutoMapper;
 using Core.DTO;
 using Core.Entidades;
 using Infraestructura.Data;
@@ -12,13 +13,13 @@ namespace API.Controllers
     {
         private readonly ApplicationDbContext _dbContext;
         private ResponseDto _response;
-
         private ILogger<CompaniaController> _Logger;
-
-        public CompaniaController(ApplicationDbContext dbContext,ILogger<CompaniaController> logger)
+        private readonly IMapper _mapper;
+        public CompaniaController(ApplicationDbContext dbContext,ILogger<CompaniaController> logger, IMapper mapper)
         {
             this._dbContext = dbContext;
-            _Logger = logger;
+            this._Logger = logger;
+            this._mapper = mapper;
             this._response = new ResponseDto();
         }
 
@@ -68,9 +69,9 @@ namespace API.Controllers
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<compania>> PostCompania([FromBody] compania compania)
+        public async Task<ActionResult<compania>> PostCompania([FromBody] CompaniaDTO companiaDTO)
         {
-            if(compania == null){
+            if(companiaDTO == null){
                 _Logger.LogError("La informacion es incorrecta.");
                 _response.Mensaje = "Informacion incorrecta.";
                 _response.IsExitoso = false;
@@ -81,7 +82,7 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var companiaExiste = await _dbContext.Compania.FirstOrDefaultAsync(c => c.Nombre.ToLower() == compania.Nombre.ToLower());
+            var companiaExiste = await _dbContext.Compania.FirstOrDefaultAsync(c => c.Nombre.ToLower() == companiaDTO.Nombre.ToLower());
 
             if(companiaExiste!=null){
 
@@ -89,17 +90,19 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            await _dbContext.Compania.AddAsync(compania);
+            compania comp = _mapper.Map<compania>(companiaDTO);
+
+            await _dbContext.Compania.AddAsync(comp);
             await _dbContext.SaveChangesAsync();
-            return CreatedAtRoute("GetCompania", new { id = compania.Id }, compania); // Status code = 201
+            return CreatedAtRoute("GetCompania", new { id = comp.Id }, comp); // Status code = 201
         }
 
         [HttpPut("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult> PutCompania(int id, [FromBody] compania compania)
+        public async Task<ActionResult> PutCompania(int id, [FromBody] CompaniaDTO companiaDTO)
         {
-            if (id != compania.Id)
+            if (id != companiaDTO.Id)
             {
                 return BadRequest("Id de compania no coincide");
             }
@@ -108,17 +111,19 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var companiaExiste = await _dbContext.Compania.FirstOrDefaultAsync(c => c.Nombre.ToLower() == compania.Nombre.ToLower() && c.Id != compania.Id);
+            var companiaExiste = await _dbContext.Compania.FirstOrDefaultAsync(c => c.Nombre.ToLower() == companiaDTO.Nombre.ToLower() && c.Id != companiaDTO.Id);
 
              if(companiaExiste != null){
                 ModelState.AddModelError("NombreDuplicado","El nombre de la compañia ya existe");
                 return BadRequest(ModelState);
              }
 
-            _dbContext.Update(compania);
+             compania comp = _mapper.Map<compania>(companiaDTO);
+
+            _dbContext.Update(comp);
             await _dbContext.SaveChangesAsync();
 
-            return Ok(compania);
+            return Ok(comp);
         }
 
         [HttpDelete("{id}")]
