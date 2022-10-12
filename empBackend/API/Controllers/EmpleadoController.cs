@@ -2,6 +2,7 @@ using AutoMapper;
 using Core.DTO;
 using Core.Entidades;
 using Infraestructura.Data;
+using Infraestructura.Data.Repositorio.IRepositorio;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,13 +12,13 @@ namespace API.Controllers
     [Route("api/[controller]")]
     public class EmpleadoController : ControllerBase
     {
-        private readonly ApplicationDbContext _dbContext;
         private ResponseDto _response;
+        private readonly IUnitOfWork _unitOfWork;
         private ILogger<EmpleadoController> _Logger;
         private readonly IMapper _mapper;
-        public EmpleadoController(ApplicationDbContext dbContext,ILogger<EmpleadoController> logger, IMapper mapper)
+        public EmpleadoController(IUnitOfWork UnitOfWork,ILogger<EmpleadoController> logger, IMapper mapper)
         {
-            this._dbContext = dbContext;
+            _unitOfWork = UnitOfWork;
             this._Logger = logger;
             this._mapper = mapper;
             this._response = new ResponseDto();
@@ -29,8 +30,7 @@ namespace API.Controllers
         public async Task<ActionResult<IEnumerable<EmpleadoReadDto>>> GetEmpleados()
         {
             _Logger.LogInformation("Listado de Empleados.");
-            var lista = await _dbContext.Empleado.Include(c => c.compania).ToListAsync();
-
+            var lista = await _unitOfWork.empleado.ObtenerTodos(incluirPropiedades: "compania");
             _response.Resultado = _mapper.Map<IEnumerable<empleado>, IEnumerable<EmpleadoReadDto>>(lista);
 
             _response.Mensaje = "Listado de Empleados";
@@ -51,8 +51,8 @@ namespace API.Controllers
                 return BadRequest(_response);
             }
 
-            var emp = await _dbContext.Empleado.Include(c => c.compania).FirstOrDefaultAsync(x => x.Id == id);
-
+            var emp = await _unitOfWork.empleado.ObtenerPrimero(x => x.Id == id,incluirPropiedades: "compania");
+           
             if (emp == null)
             {
                 _Logger.LogError("El empleado no existe.");
@@ -83,7 +83,7 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var empleadoExiste = await _dbContext.Empleado.FirstOrDefaultAsync(c => c.Nombres.ToLower() == empleadoDTO.Nombres.ToLower() 
+            var empleadoExiste = await _unitOfWork.empleado.ObtenerPrimero(c => c.Nombres.ToLower() == empleadoDTO.Nombres.ToLower()
                                                 && c.Apellidos.ToLower() == empleadoDTO.Apellidos.ToLower());
 
             if(empleadoExiste!=null){
@@ -94,8 +94,8 @@ namespace API.Controllers
 
             empleado emp = _mapper.Map<empleado>(empleadoDTO);
 
-            await _dbContext.Empleado.AddAsync(emp);
-            await _dbContext.SaveChangesAsync();
+            await _unitOfWork.empleado.Agregar(emp);
+            await  _unitOfWork.Guardar();
             return CreatedAtRoute("GetCompania", new { id = emp.Id }, emp); // Status code = 201
         }
 
@@ -113,7 +113,7 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var empleadoExiste = await _dbContext.Empleado.FirstOrDefaultAsync(c => c.Nombres.ToLower() == EmpleadoDto.Nombres.ToLower() &&
+            var empleadoExiste = await _unitOfWork.empleado.ObtenerPrimero(c => c.Nombres.ToLower() == EmpleadoDto.Nombres.ToLower() &&
                                                     c.Apellidos.ToLower() == EmpleadoDto.Apellidos.ToLower() &&
                                                     c.Id != EmpleadoDto.Id);
 
@@ -124,8 +124,8 @@ namespace API.Controllers
 
              empleado emp = _mapper.Map<empleado>(EmpleadoDto);
 
-            _dbContext.Update(emp);
-            await _dbContext.SaveChangesAsync();
+            _unitOfWork.empleado.Actualizar(emp);
+            await _unitOfWork.Guardar();
 
             return Ok(emp);
         }
@@ -141,16 +141,16 @@ namespace API.Controllers
                 return BadRequest();
             }
 
-            var compania = await _dbContext.Empleado.FindAsync(id);
+            var compania = await _unitOfWork.empleado.ObtenerPrimero(c => c.Id == id);
 
             if (compania == null)
             {
                 return NotFound();
             }
 
-            _dbContext.Remove(compania);
+            _unitOfWork.empleado.Remover(compania);
 
-            await _dbContext.SaveChangesAsync();
+            await _unitOfWork.Guardar();
             
             return NoContent();
         }
@@ -166,7 +166,7 @@ namespace API.Controllers
         {
             if(companiaId==0) return BadRequest();
             
-            var Lista = await _dbContext.Empleado.Include(c => c.compania).Where(e => e.CompaniaId == companiaId).ToListAsync();
+            var Lista = await _unitOfWork.empleado.ObtenerTodos(e => e.CompaniaId == companiaId, incluirPropiedades: "compania");
 
             if(Lista == null) 
             {

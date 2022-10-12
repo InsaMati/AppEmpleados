@@ -2,6 +2,7 @@ using AutoMapper;
 using Core.DTO;
 using Core.Entidades;
 using Infraestructura.Data;
+using Infraestructura.Data.Repositorio.IRepositorio;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,13 +12,13 @@ namespace API.Controllers
     [Route("api/[controller]")]
     public class CompaniaController : ControllerBase
     {
-        private readonly ApplicationDbContext _dbContext;
         private ResponseDto _response;
+        private readonly IUnitOfWork _unitOfWork;
         private ILogger<CompaniaController> _Logger;
         private readonly IMapper _mapper;
-        public CompaniaController(ApplicationDbContext dbContext,ILogger<CompaniaController> logger, IMapper mapper)
+        public CompaniaController(IUnitOfWork UnitOfWork,ILogger<CompaniaController> logger, IMapper mapper)
         {
-            this._dbContext = dbContext;
+            _unitOfWork = UnitOfWork;
             this._Logger = logger;
             this._mapper = mapper;
             this._response = new ResponseDto();
@@ -29,7 +30,7 @@ namespace API.Controllers
         public async Task<ActionResult<IEnumerable<compania>>> GetCompanias()
         {
             _Logger.LogInformation("Listado de compañias.");
-            var lista = await _dbContext.Compania.ToListAsync();
+            var lista = await _unitOfWork.compania.ObtenerTodos();
             _response.Resultado = lista;
             _response.Mensaje = "Listado de Compañias";
 
@@ -50,7 +51,7 @@ namespace API.Controllers
                 return BadRequest(_response);
             }
 
-            var comp = await _dbContext.Compania.FindAsync(id);
+            var comp = await _unitOfWork.compania.ObtenerPrimero(c => c.Id == id);
 
             if (comp == null)
             {
@@ -82,8 +83,8 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var companiaExiste = await _dbContext.Compania.FirstOrDefaultAsync(c => c.Nombre.ToLower() == companiaDTO.Nombre.ToLower());
-
+            var companiaExiste = await _unitOfWork.compania.ObtenerPrimero(c => c.Nombre.ToLower() == companiaDTO.Nombre.ToLower());
+ 
             if(companiaExiste!=null){
 
                 ModelState.AddModelError("NombreDuplicado","El nombre de la compañia ya existe.");
@@ -92,8 +93,9 @@ namespace API.Controllers
 
             compania comp = _mapper.Map<compania>(companiaDTO);
 
-            await _dbContext.Compania.AddAsync(comp);
-            await _dbContext.SaveChangesAsync();
+
+            await _unitOfWork.compania.Agregar(comp);
+            await _unitOfWork.Guardar();
             return CreatedAtRoute("GetCompania", new { id = comp.Id }, comp); // Status code = 201
         }
 
@@ -111,7 +113,7 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var companiaExiste = await _dbContext.Compania.FirstOrDefaultAsync(c => c.Nombre.ToLower() == companiaDTO.Nombre.ToLower() && c.Id != companiaDTO.Id);
+            var companiaExiste = await _unitOfWork.compania.ObtenerPrimero(c => c.Nombre.ToLower() == companiaDTO.Nombre.ToLower() && c.Id != companiaDTO.Id);
 
              if(companiaExiste != null){
                 ModelState.AddModelError("NombreDuplicado","El nombre de la compañia ya existe");
@@ -120,8 +122,8 @@ namespace API.Controllers
 
              compania comp = _mapper.Map<compania>(companiaDTO);
 
-            _dbContext.Update(comp);
-            await _dbContext.SaveChangesAsync();
+            _unitOfWork.compania.Actualizar(comp);
+            await _unitOfWork.Guardar();
 
             return Ok(comp);
         }
@@ -137,17 +139,16 @@ namespace API.Controllers
                 return BadRequest();
             }
 
-            var compania = await _dbContext.Compania.FindAsync(id);
+            var compania = await _unitOfWork.compania.ObtenerPrimero(c => c.Id == id);
 
             if (compania == null)
             {
                 return NotFound();
             }
 
-            _dbContext.Remove(compania);
+            _unitOfWork.compania.Remover(compania);
 
-            await _dbContext.SaveChangesAsync();
-            
+            await _unitOfWork.Guardar();
 
             return NoContent();
         }
